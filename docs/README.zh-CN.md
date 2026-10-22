@@ -21,6 +21,9 @@ npm ci
 npm start
 ```
 
+首次启动或打包会下载锁定版本的 Electron 运行时。如果下载超时，可参考
+[Electron 镜像配置](https://www.electronjs.org/docs/latest/tutorial/installation#mirror)。
+
 点左侧 **+** 添加平台并登录。右侧登录 AI。在 X 帖子下点 **Send to AI**，检查生成的草稿后自行发送。已有 AI 草稿会被保留。
 
 ```sh

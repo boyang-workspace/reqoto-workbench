@@ -33,6 +33,10 @@ npm ci
 npm start
 ```
 
+The first launch or packaging command downloads the pinned Electron runtime.
+If the download is unavailable on your network, see Electron's
+[mirror configuration](https://www.electronjs.org/docs/latest/tutorial/installation#mirror).
+
 Start with an empty rail. Click **+**, choose a platform, then sign in inside the
 social pane. Add another workspace account to get a separate session, even on the
 same platform. Log into ChatGPT or Grok on the right. In a loaded X post, click

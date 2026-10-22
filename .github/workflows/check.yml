@@ -17,3 +17,25 @@ jobs:
       - run: npm run check
       - run: npm test
       - run: npm run scan
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run package:mac
+      - name: Check distribution contents
+        run: |
+          python3 - <<'PYTHON'
+          from pathlib import Path
+          resources = Path('dist/Reqoto Workbench.app/Contents/Resources')
+          for name in ['LICENSE', 'NOTICE', 'THIRD_PARTY_NOTICES.md', 'src/reqoto-adapter/post-toolbar.js', 'src/reqoto-adapter/chatgpt-fill.js']:
+              assert (resources / 'app' / name).is_file(), name
+          for name in ['Electron-LICENSE.txt', 'LICENSES.chromium.html']:
+              assert (resources / 'third-party' / name).is_file(), name
+          assert not list(resources.rglob('*.gguf'))
+          assert not (resources / 'reqoto-runtime').exists()
+          PYTHON
