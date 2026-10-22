@@ -1,0 +1,29 @@
+{
+  "name": "reqoto-workbench",
+  "version": "0.8.5",
+  "private": true,
+  "description": "A local multi-identity social browser workspace",
+  "main": "src/main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test test/*.test.cjs",
+    "check": "node --check src/layout.cjs && node --check src/surface.js && node --check src/popups.cjs && node --check src/main.cjs && node --check src/ui.js && node --check src/model.cjs && node --check src/reqoto.cjs && node --check src/local-models.cjs && node --check src/judge.cjs && node --check src/analysis.cjs && node --check src/screen-media.cjs && node --check src/analysis-page.cjs && node --check src/preferences.cjs",
+    "package:mac": "python3 scripts/package-macos.py",
+    "scan": "python3 scripts/scan-secrets.py"
+  },
+  "devDependencies": {
+    "electron": "42.11.17"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/boyang-workspace/reqoto-workbench.git"
+  },
+  "homepage": "https://github.com/boyang-workspace/reqoto-workbench#readme",
+  "bugs": {
+    "url": "https://github.com/boyang-workspace/reqoto-workbench/issues"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}

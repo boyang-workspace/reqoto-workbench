@@ -1,0 +1,20 @@
+const en={
+'请输入不含凭据的 HTTPS 地址':'Enter an HTTPS URL without credentials.',
+'不支持的 AI 服务':'Unsupported AI service.',
+'对话地址与 AI 服务不匹配':'Conversation URL does not match the AI service.',
+'请先在社媒页面选中要导入的文字':'Select text in the social page first.',
+'身份不存在':'Account space not found.',
+'设置文件损坏，已停止写入；请先备份修复并重启':'Settings could not be read. Back up the file and repair it before restarting.',
+'设置文件需要修复，暂不能添加':'Repair the settings file before adding accounts.',
+'提示词已保存':'Prompt saved.',
+'请先打开对应 AI 的对话页面':'Open a conversation in the selected AI service first.',
+'当前对话已绑定':'Conversation bound.',
+'身份或页面已切换，请重新导入':'The account or page changed. Select the content again.',
+'内容已复制；请先进入对应 AI 网站':'Copied. Open the selected AI service first.',
+'已有草稿，未覆盖；新内容已复制，请手动合并':'Existing draft preserved. New content copied for manual merging.',
+'未找到 AI 输入框；内容已复制，请手动粘贴':'Composer not found. Content copied for manual pasting.',
+'身份已切换，未填入；内容已复制':'Account changed. Content copied; nothing inserted.',
+'已填入 AI 输入框，请审阅后自行发送':'Inserted. Review before sending.',
+'已复制当前身份的提示词与选中文字，请在右侧审阅粘贴':'Context copied.',
+};
+module.exports=(message,lang)=>lang==='en'?(en[message]||message):message;
