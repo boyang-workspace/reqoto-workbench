@@ -29,6 +29,7 @@ local data directory at `runtime/bin/llama-server` and `models/d1-3B-Q8_0.gguf`.
 It never searches a neighboring private project. Model files remain outside the
 app; removing or rebuilding the app does not delete them.
 
+Run `npx install-electron` before invoking the Python packager directly.
 To build with a redistributable runtime, use
 `python3 scripts/package-macos.py --runtime-dir /absolute/path/to/runtime`.
 That directory must contain `bin/llama-server`, its shared libraries and all

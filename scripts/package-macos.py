@@ -18,7 +18,7 @@ root = pathlib.Path(__file__).resolve().parents[1]
 electron = root / 'node_modules/electron/dist'
 runtime = electron / 'Electron.app'
 if not runtime.exists():
-    sys.exit('Electron runtime missing. Run npm ci first.')
+    sys.exit('Electron runtime missing. Run npm ci, then npx install-electron.')
 if args.runtime_dir:
     args.runtime_dir = args.runtime_dir.resolve()
     if not (args.runtime_dir / 'bin/llama-server').is_file() or not list(args.runtime_dir.glob('LICENSE*')):
