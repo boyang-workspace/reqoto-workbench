@@ -48,3 +48,6 @@ body{background:var(--rail-bg)}.social-tools{border-radius:12px 0 0 0}#empty,#so
 #delete-template svg{width:16px;height:16px;display:block}
 /* The social surface shadow belongs only to its left outer edge. */
 #social-outline{clip-path:inset(-8px calc(100% - 16px) -8px -8px)}
+/* The collapsed toggle overlaps this toolbar. A sibling drag region can
+   swallow its native hit target even when the button has a higher z-index. */
+:root[data-collapsed=true] .social-tools{-webkit-app-region:no-drag}
