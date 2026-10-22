@@ -22,7 +22,7 @@ app.on('second-instance',()=>{if(win&&!win.isDestroyed()){if(win.isMinimized())w
 Menu.setApplicationMenu(Menu.buildFromTemplate([{ label:'Reqoto', submenu:[{role:'about'},{type:'separator'},{role:'quit'}] },{role:'editMenu'},{role:'viewMenu'},{role:'windowMenu'}]));
 let win, settingsView, storageError=false, overlay=false, settingsOpen=false, resizeKind=null, railDrag=null, railScroll=0, suppressSelectUntil=0,localModels,judge;
 let keyStorage='session';
-const keys={},analysisCache=new Map();let analysisBusy=false;
+const keys={},analysisCache=new Map();let analysisBusy=false;let aiActivity={at:0,busy:false};
 let state={identities:[],active:null,ratio:.52,sidebar:184,sidebarCollapsed:false,lang:'zh',ai:model.aiState(),theme:'system',templates:[]};
 const panes=new Map(), aiPanes=new Map();
 const file=()=>path.join(app.getPath('userData'),'workspace.json');
@@ -88,7 +88,7 @@ function trackResize(wc){wc.on('before-mouse-event',(event,mouse)=>{
 });}
 function createPane(partition,id,side){
  const ses=session.fromPartition(partition);configureWebSession(ses);
- const view=new WebContentsView({webPreferences:{session:ses,nodeIntegration:false,contextIsolation:true,sandbox:true}}),wc=view.webContents;
+ const view=new WebContentsView({webPreferences:{session:ses,nodeIntegration:false,contextIsolation:true,sandbox:true,backgroundThrottling:side!=='ai'}}),wc=view.webContents;
  const pane={view,status:{phase:'loading'}};trackResize(wc);
  wc.on('dom-ready',()=>{wc.insertCSS(REMOTE_CSS,{cssOrigin:'user'}).catch(()=>{});});
  const status=(phase,extra={})=>{pane.status={phase,url:wc.getURL(),...extra};layout();send();};
@@ -129,10 +129,19 @@ async function installToolbar(i){
   await wc.executeJavaScriptInIsolatedWorld(reqoto.WORLD,[{code:`globalThis.ReqotoAnalysisContext=${collectContext.toString()};(${analysisPage.installAnalysis.toString()})(${JSON.stringify(options)})`}]);
  }
 }
+async function aiGenerating(){
+ const wc=aiPane()?.view.webContents;if(!wc||wc.isDestroyed())return false;
+ if(Date.now()-aiActivity.at<450)return aiActivity.busy;
+ aiActivity.at=Date.now();
+ try{aiActivity.busy=await wc.executeJavaScript(`Boolean(document.querySelector('button[data-testid="stop-button"],button[aria-label="Stop generating"],button[aria-label="停止生成"],button[aria-label="Stop response"]'))`);}catch{aiActivity.busy=false;}
+ return aiActivity.busy;
+}
 async function pollAnalysis(){
  if(analysisBusy||overlay||settingsOpen||!win?.isVisible()||win.isMinimized()||!item()?.profile?.enabled)return;
  const i=item(),wc=panes.get(i.id)?.view.webContents;if(!wc||wc.isDestroyed()||!/^https:\/\/(www\.)?(x|twitter)\.com\//.test(wc.getURL()))return;
- analysisBusy=true;const rev=revision(i),sourceUrl=wc.getURL();let entry;
+ if(await aiGenerating())return;
+ if(analysisBusy)return;
+ analysisBusy=true;const rev=revision(i),sourceUrl=wc.getURL();let entry,monitor;
  const assertCurrent=()=>{if(revision(i)!==rev||state.active!==i.id||wc.isDestroyed()||wc.getURL()!==sourceUrl||overlay||settingsOpen||!win?.isVisible()||win.isMinimized())throw Error('Screening context changed');};
  try{
   const result=await wc.executeJavaScriptInIsolatedWorld(reqoto.WORLD,[{code:'(() => {globalThis.ReqotoAnalysisScan?.();return {feedback:globalThis.ReqotoFeedbackQueue?.shift(),entry:('+analysisPage.nextEntry.toString()+')(),account:('+accounts.detectAccount.toString()+')()};})()'}]);
@@ -144,10 +153,13 @@ async function pollAnalysis(){
   }
   entry=result.entry;if(!entry||entry.revision!==rev||entry.sourceUrl!==sourceUrl)return;
   const queueMs=Math.max(0,Date.now()-(entry.enqueuedAt||Date.now()));
-  const key=JSON.stringify([rev,entry.post]);let target=analysisCache.get(key);
+  const key=JSON.stringify([rev,entry.post]);let target=analysisCache.get(key);let probing=false;
+  const controller=new AbortController();
+  const watch=async()=>{if(probing)return;probing=true;try{assertCurrent();const visible=await wc.executeJavaScriptInIsolatedWorld(reqoto.WORLD,[{code:`(${analysisPage.postVisible.toString()})(${JSON.stringify(entry.post.id)})`}]);if(!visible||await aiGenerating())controller.abort();}catch{controller.abort();}finally{probing=false;}};
   if(!target){
+   monitor=setInterval(watch,500);
    const prepareMedia=async()=>['d1-local','liquid-d1'].includes(i.profile.engine)?await prepareScreenMedia(entry.post,{assertCurrent,download:address=>media.downloadImage(wc.session,address),resize:inferencePhoto,captureVideo:async()=>{assertCurrent();const rect=await wc.executeJavaScriptInIsolatedWorld(reqoto.WORLD,[{code:reqoto.videoRectSource(entry.post.id)}]);assertCurrent();if(!rect)throw Error('Video not visible');const crop=geometry.captureRect(rect,panes.get(i.id).view.getBounds(),wc.getZoomFactor());const shot=await wc.capturePage(crop);assertCurrent();return {dataUrl:inferencePhoto({mimeType:'image/png',data:shot.toPNG().toString('base64')}),timestamp:rect.time,preview:rect.preview};}}):entry.post;
-   assertCurrent();target=i.profile.screening==='strict'?await judge.evaluate(await prepareMedia(),i.profile):await judge.evaluateFast(entry.post,i.profile,{prepareMedia});
+   assertCurrent();target=i.profile.screening==='strict'?await judge.evaluate(i.profile.screenImages?await prepareMedia():entry.post,i.profile,{signal:controller.signal}):await judge.evaluateFast(entry.post,i.profile,{prepareMedia:i.profile.screenImages?prepareMedia:undefined,signal:controller.signal});
   }
   assertCurrent();const current=await wc.executeJavaScript('('+accounts.detectAccount.toString()+')()');assertCurrent();if(current?.handle!==i.account?.handle||current?.status!=='signed-in')return;
   analysisCache.set(key,target);while(analysisCache.size>500)analysisCache.delete(analysisCache.keys().next().value);
@@ -155,8 +167,8 @@ async function pollAnalysis(){
   if(decision.timings)decision.timings={...decision.timings,queueMs};
   const title=analysis.resultSummary(decision,state.lang);
   await wc.executeJavaScriptInIsolatedWorld(reqoto.WORLD,[{code:`(${analysisPage.applyResult.toString()})(${JSON.stringify(entry.post.id)},${JSON.stringify(decision)},${JSON.stringify(title)})`}]);
- }catch(error){if(entry&&!wc.isDestroyed()&&error.message==='Screening context changed')await wc.executeJavaScriptInIsolatedWorld(reqoto.WORLD,[{code:`(${analysisPage.releasePending.toString()})(${JSON.stringify(entry.post.id)},${JSON.stringify(rev)},${JSON.stringify(sourceUrl)})`}]).catch(()=>{});else if(entry&&revision(i)===rev&&state.active===i.id&&!wc.isDestroyed()&&wc.getURL()===sourceUrl&&!settingsOpen)await wc.executeJavaScriptInIsolatedWorld(reqoto.WORLD,[{code:`(${analysisPage.applyResult.toString()})(${JSON.stringify(entry.post.id)},{label:'error'},${JSON.stringify(error.message)})`}]).catch(()=>{});}
- finally{analysisBusy=false;}
+ }catch(error){if(entry&&!wc.isDestroyed()&&(error.message==='Screening context changed'||error.name==='AbortError'))await wc.executeJavaScriptInIsolatedWorld(reqoto.WORLD,[{code:`(${analysisPage.releasePending.toString()})(${JSON.stringify(entry.post.id)},${JSON.stringify(rev)},${JSON.stringify(sourceUrl)})`}]).catch(()=>{});else if(entry&&revision(i)===rev&&state.active===i.id&&!wc.isDestroyed()&&wc.getURL()===sourceUrl&&!settingsOpen)await wc.executeJavaScriptInIsolatedWorld(reqoto.WORLD,[{code:`(${analysisPage.applyResult.toString()})(${JSON.stringify(entry.post.id)},{label:'error'},${JSON.stringify(error.message)})`}]).catch(()=>{});}
+ finally{clearInterval(monitor);analysisBusy=false;}
 }
 function inferencePhoto(photo){
  const data=Buffer.from(photo.data,'base64');if(data.length>8*1024*1024)throw Error('Image too large');

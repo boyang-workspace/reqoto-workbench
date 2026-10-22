@@ -12,7 +12,9 @@ files and upstream runtime instructions. The chosen runtime must support d1's
 OpenAI-compatible runtimes are not sufficient. The app launches the executable
 itself, rather than attaching to an arbitrary existing server.
 
-Select the runtime executable and model in settings. For image judgment, also
+Select the runtime executable and model in settings. Browsing screening is text-only
+by default. Enable “Analyze images while browsing” per account for slower visual
+analysis; capture attachments and explicit image tests work independently. For image judgment, also
 select the matching vision projector (mmproj GGUF). Missing vision context is not
 proof that a post is irrelevant. This source distribution includes no weights,
 runtime executable, download service or EmbeddingGemma integration.

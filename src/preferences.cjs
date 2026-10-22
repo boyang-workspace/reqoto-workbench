@@ -2,7 +2,7 @@
 const engines = ['d1-local','liquid-d1','jev'];
 const text=(value,max=2000)=>typeof value==='string'?value.slice(0,max):'';
 function profile(input={},legacy=false){
- return {enabled:input.enabled===true&&!(['embedding-local','hybrid'].includes(input.engine)),engine:engines.includes(input.engine)?input.engine:'d1-local',
+ return {enabled:input.enabled===true&&!(['embedding-local','hybrid'].includes(input.engine)),screenImages:input.screenImages===true,engine:engines.includes(input.engine)?input.engine:'d1-local',
   promptMode:input.promptMode==='custom'||legacy&&input.promptMode!=='guided'?'custom':'guided',
   persona:text(input.persona),tone:['natural','friendly','professional','playful'].includes(input.tone)?input.tone:'natural',
   voice:['direct','curious','empathetic'].includes(input.voice)?input.voice:'direct',

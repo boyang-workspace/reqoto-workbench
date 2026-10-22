@@ -29,7 +29,7 @@
 <label><span data-i="skipTopics">跳过的话题</span><textarea id="skipTopics" rows="2" maxlength="2000" data-placeholder="skipTopicsHint"></textarea></label>
 <label><span data-i="screening">筛选倾向</span><select id="screening"><option value="balanced" data-i="balanced">平衡</option><option value="strict" data-i="strict">只推荐明确机会</option></select></label>
 <p class="hint" data-i="screenHelp">结合基础页的人设、主题判断。结果只作标记；用帖子工具条 ＋ / − 纠正。</p>
-<label class="check"><input id="analysis-enabled" type="checkbox"><span data-i="enableAnalysis">筛选当前可见帖子</span></label>
+<label class="check"><input id="analysis-enabled" type="checkbox"><span data-i="enableAnalysis">筛选当前可见帖子</span></label><label class="check"><input id="screen-images" type="checkbox"><span data-i="screenImages">筛选时分析图片（较慢）</span></label>
 <label><span data-i="engine">判断方式</span><select id="engine"><option value="d1-local">d1 · Local</option><option value="liquid-d1">Liquid d1 · BYOK</option><option value="jev">Jev · BYOK</option></select></label>
 <p id="engine-help" class="hint"></p>
 <div id="local-models"><div class="model-row"><div><strong>d1</strong><small id="d1-state"></small></div><button type="button" data-model-file="d1" data-i="chooseFile">选择文件</button><button type="button" data-model-start="d1" data-i="start">启动</button><button type="button" data-model-stop="d1" data-i="stop">停止</button></div><div class="model-row"><div><strong>d1 Vision</strong><small id="vision-state"></small></div><button type="button" data-model-file="mmproj" data-i="chooseFile">选文件</button></div><button type="button" class="text-button" data-model-file="runtime" data-i="chooseRuntime">选择推理程序</button><p id="runtime-state" class="hint"></p></div>

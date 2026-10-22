@@ -129,3 +129,13 @@ test('queue drops offscreen work and makes it retryable when visible again',()=>
  const context={innerHeight:700,document:{querySelectorAll:()=>[target]},ReqotoTriageCore:{cardPost:()=>({id:'on'})},ReqotoAnalysisQueue:[off,on],ReqotoAnalysisSeen:new Map([['off','signature']])};
  assert.equal(vm.runInNewContext(`(${page.nextEntry.toString()})()`,context),on);assert.equal(context.ReqotoAnalysisSeen.has('off'),false);
 });
+test('text-only browsing does not run a visual second pass and keeps media-dependent content review',async()=>{
+ let calls=0;const judge=new Judge({request:async()=>{calls++;return {answers:{worth_reply:{noul:.8}}};}},()=>null);
+ const result=await judge.evaluateFast({text:'Look at this image',hasMedia:true},{});
+ assert.equal(calls,1);assert.equal(result.label,'unsure');assert.equal(result.media.imageCount,0);
+});
+test('cancelled screening cannot initiate another model request',async()=>{
+ const controller=new AbortController();controller.abort();let calls=0;
+ const judge=new Judge({request:async()=>{calls++;}},()=>null);
+ await assert.rejects(judge.evaluateFast({text:'Synthetic post'},{},{signal:controller.signal}),{name:'AbortError'});assert.equal(calls,0);
+});

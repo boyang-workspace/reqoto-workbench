@@ -6,7 +6,7 @@
   let language = "en", assistant = "chatgpt", enabled = false, busy = false, captureHandler, feedbackHandler, scheduled;
   const tr = key => XReplyLocale.forAssistant(language, key, assistant);
   const captureLabel = () => (language === "zh" ? "发送至 " : "Send to ") + (assistant === "grok" ? "Grok" : "ChatGPT");
-  function captureIcon(record, success) { record.capture.innerHTML = success ? check : logo; const label=document.createElement("span"); label.textContent=captureLabel(); record.capture.append(label); }
+  function captureIcon(record, success) { const key=String(success)+captureLabel();if(record.captureIconKey===key)return;record.captureIconKey=key;record.capture.innerHTML = success ? check : logo; const label=document.createElement("span"); label.textContent=captureLabel(); record.capture.append(label); }
   const logo = '<svg viewBox="0 0 128 128" aria-hidden="true"><rect width="128" height="128" rx="26" fill="#ffd83d"/><rect x="30" y="25" width="21" height="78" rx="6" fill="#171717"/><rect x="43" y="25" width="53" height="50" rx="23" fill="#171717"/><path d="M54 66h22l28 37H79L54 66Z" fill="#171717"/><rect x="53" y="42" width="24" height="16" rx="8" fill="#ffd83d"/></svg>';
   const check = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4.5 4.5L19 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   const css = [

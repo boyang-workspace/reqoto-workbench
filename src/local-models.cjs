@@ -38,7 +38,7 @@ class LocalModels{
   })().catch(error=>{slot.child?.kill('SIGTERM');slot.phase='error';slot.error=error.message;this.notify();throw error;}).finally(()=>{delete slot.promise;});
   return slot.promise;
  }
- async request(key,endpoint,body){if(key==='d1'&&body.images?.length&&!fs.existsSync(this.projector()))throw Error('Choose the d1 vision projector (mmproj GGUF) to analyze images');const slot=await this.start(key);const r=await fetch(`http://127.0.0.1:${slot.port}${endpoint}`,{method:'POST',headers:{Authorization:'Bearer '+slot.token,'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(90000)});if(!r.ok)throw Error(`Local model HTTP ${r.status}`);return r.json();}
+ async request(key,endpoint,body,{signal}={}){signal?.throwIfAborted();if(key==='d1'&&body.images?.length&&!fs.existsSync(this.projector()))throw Error('Choose the d1 vision projector (mmproj GGUF) to analyze images');const slot=await this.start(key);signal?.throwIfAborted();const r=await fetch(`http://127.0.0.1:${slot.port}${endpoint}`,{method:'POST',headers:{Authorization:'Bearer '+slot.token,'Content-Type':'application/json'},body:JSON.stringify(body),signal:signal?AbortSignal.any([signal,AbortSignal.timeout(90000)]):AbortSignal.timeout(90000)});if(!r.ok)throw Error(`Local model HTTP ${r.status}`);return r.json();}
  stop(key){for(const name of key?[key]:Object.keys(this.slots)){const slot=this.slots[name];delete this.slots[name];slot?.child?.kill('SIGTERM');}this.notify();}
  close(){this.closed=true;this.stop();}
 }

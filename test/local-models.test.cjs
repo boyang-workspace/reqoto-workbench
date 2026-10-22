@@ -14,3 +14,7 @@ test('public model discovery uses application data without a sibling private che
  if(!process.env.REQOTO_LLAMA_SERVER)assert.equal(result.runtime,'/private/tmp/reqoto-test-empty-resources/reqoto-runtime/bin/llama-server');
  if(!process.env.REQOTO_D1_MODEL)assert.equal(result.d1,'/private/tmp/reqoto-test-empty-data/models/d1-3B-Q8_0.gguf');
 });
+test('aborted local inference never launches the model',async()=>{
+ const controller=new AbortController();controller.abort();const local=new LocalModels({paths:{}});let starts=0;
+ local.start=async()=>{starts++;};await assert.rejects(local.request('d1','/v1/systemone',{}, {signal:controller.signal}),{name:'AbortError'});assert.equal(starts,0);local.close();
+});

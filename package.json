@@ -1,6 +1,6 @@
 {
   "name": "reqoto-workbench",
-  "version": "0.8.6",
+  "version": "0.8.7",
   "private": true,
   "description": "A local multi-identity social browser workspace",
   "main": "src/main.cjs",
