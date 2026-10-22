@@ -68,6 +68,11 @@ suggestions and review the original post. Local d1 needs a compatible
 `llama-server`, GGUF model and optional vision projector selected in settings;
 see [setup and data flow](docs/local-models.md).
 
+Balanced screening uses a single text-first decision question. It requests visual
+context only for media-dependent or uncertain posts; strict screening retains the
+four-signal analysis. Pending work prioritizes visible posts. Result tooltips show
+model, media and queue timings. These labels are model signals, not calibrated probabilities.
+
 ## Privacy and storage
 
 There is no Reqoto backend or telemetry in this prototype. Login cookies and

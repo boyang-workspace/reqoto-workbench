@@ -135,7 +135,7 @@ async function pollAnalysis(){
  analysisBusy=true;const rev=revision(i),sourceUrl=wc.getURL();let entry;
  const assertCurrent=()=>{if(revision(i)!==rev||state.active!==i.id||wc.isDestroyed()||wc.getURL()!==sourceUrl||overlay||settingsOpen||!win?.isVisible()||win.isMinimized())throw Error('Screening context changed');};
  try{
-  const result=await wc.executeJavaScriptInIsolatedWorld(reqoto.WORLD,[{code:'(() => {globalThis.ReqotoAnalysisScan?.();return {feedback:globalThis.ReqotoFeedbackQueue?.shift(),entry:globalThis.ReqotoAnalysisQueue?.shift(),account:('+accounts.detectAccount.toString()+')()};})()'}]);
+  const result=await wc.executeJavaScriptInIsolatedWorld(reqoto.WORLD,[{code:'(() => {globalThis.ReqotoAnalysisScan?.();return {feedback:globalThis.ReqotoFeedbackQueue?.shift(),entry:('+analysisPage.nextEntry.toString()+')(),account:('+accounts.detectAccount.toString()+')()};})()'}]);
   entry=result.entry;
   if(revision(i)!==rev||state.active!==i.id)throw Error('Screening context changed');
   if(result.account?.status!=='signed-in'||result.account.handle!==i.account?.handle)return;
@@ -143,14 +143,16 @@ async function pollAnalysis(){
    const p=analysis.candidate(result.feedback.post),previous=i.profile.feedback.find(x=>x.id===p.id);i.profile.feedback=i.profile.feedback.filter(x=>x.id!==p.id);if(previous?.label!==result.feedback.label)i.profile.feedback.push({id:p.id,text:p.text,label:result.feedback.label});i.profile.feedback=i.profile.feedback.slice(-100);save();analysisCache.clear();await installToolbar(i);send();return;
   }
   entry=result.entry;if(!entry||entry.revision!==rev||entry.sourceUrl!==sourceUrl)return;
+  const queueMs=Math.max(0,Date.now()-(entry.enqueuedAt||Date.now()));
   const key=JSON.stringify([rev,entry.post]);let target=analysisCache.get(key);
   if(!target){
-   const post=['d1-local','liquid-d1'].includes(i.profile.engine)?await prepareScreenMedia(entry.post,{assertCurrent,download:address=>media.downloadImage(wc.session,address),resize:inferencePhoto,captureVideo:async()=>{assertCurrent();const rect=await wc.executeJavaScriptInIsolatedWorld(reqoto.WORLD,[{code:reqoto.videoRectSource(entry.post.id)}]);assertCurrent();if(!rect)throw Error('Video not visible');const crop=geometry.captureRect(rect,panes.get(i.id).view.getBounds(),wc.getZoomFactor());const shot=await wc.capturePage(crop);assertCurrent();return {dataUrl:inferencePhoto({mimeType:'image/png',data:shot.toPNG().toString('base64')}),timestamp:rect.time,preview:rect.preview};}}):entry.post;
-   assertCurrent();target=await judge.evaluate(post,i.profile);
+   const prepareMedia=async()=>['d1-local','liquid-d1'].includes(i.profile.engine)?await prepareScreenMedia(entry.post,{assertCurrent,download:address=>media.downloadImage(wc.session,address),resize:inferencePhoto,captureVideo:async()=>{assertCurrent();const rect=await wc.executeJavaScriptInIsolatedWorld(reqoto.WORLD,[{code:reqoto.videoRectSource(entry.post.id)}]);assertCurrent();if(!rect)throw Error('Video not visible');const crop=geometry.captureRect(rect,panes.get(i.id).view.getBounds(),wc.getZoomFactor());const shot=await wc.capturePage(crop);assertCurrent();return {dataUrl:inferencePhoto({mimeType:'image/png',data:shot.toPNG().toString('base64')}),timestamp:rect.time,preview:rect.preview};}}):entry.post;
+   assertCurrent();target=i.profile.screening==='strict'?await judge.evaluate(await prepareMedia(),i.profile):await judge.evaluateFast(entry.post,i.profile,{prepareMedia});
   }
   assertCurrent();const current=await wc.executeJavaScript('('+accounts.detectAccount.toString()+')()');assertCurrent();if(current?.handle!==i.account?.handle||current?.status!=='signed-in')return;
   analysisCache.set(key,target);while(analysisCache.size>500)analysisCache.delete(analysisCache.keys().next().value);
   const manual=i.profile.feedback.find(x=>x.id===entry.post.id),decision=manual?{...target,label:manual.label,manual:{label:manual.label}}:target;
+  if(decision.timings)decision.timings={...decision.timings,queueMs};
   const title=analysis.resultSummary(decision,state.lang);
   await wc.executeJavaScriptInIsolatedWorld(reqoto.WORLD,[{code:`(${analysisPage.applyResult.toString()})(${JSON.stringify(entry.post.id)},${JSON.stringify(decision)},${JSON.stringify(title)})`}]);
  }catch(error){if(entry&&!wc.isDestroyed()&&error.message==='Screening context changed')await wc.executeJavaScriptInIsolatedWorld(reqoto.WORLD,[{code:`(${analysisPage.releasePending.toString()})(${JSON.stringify(entry.post.id)},${JSON.stringify(rev)},${JSON.stringify(sourceUrl)})`}]).catch(()=>{});else if(entry&&revision(i)===rev&&state.active===i.id&&!wc.isDestroyed()&&wc.getURL()===sourceUrl&&!settingsOpen)await wc.executeJavaScriptInIsolatedWorld(reqoto.WORLD,[{code:`(${analysisPage.applyResult.toString()})(${JSON.stringify(entry.post.id)},{label:'error'},${JSON.stringify(error.message)})`}]).catch(()=>{});}
@@ -235,7 +237,7 @@ app.whenReady().then(()=>{
  trackResize(win.webContents);win.on('blur',()=>{resizeKind=null;railDrag=null;});win.webContents.setWindowOpenHandler(()=>({action:'deny'}));win.webContents.on('will-navigate',e=>e.preventDefault());
  settingsView=new WebContentsView({webPreferences:{preload:path.join(__dirname,'preload.cjs'),sandbox:true,contextIsolation:true,nodeIntegration:false}});settingsView.setBackgroundColor('#00000000');settingsView.setVisible(false);win.contentView.addChildView(settingsView);trackResize(settingsView.webContents);settingsView.webContents.setWindowOpenHandler(()=>({action:'deny'}));settingsView.webContents.on('will-navigate',e=>e.preventDefault());settingsView.webContents.loadFile(path.join(__dirname,'index.html'),{query:{surface:'settings'}});
  win.loadFile(path.join(__dirname,'index.html'));win.webContents.on('did-finish-load',()=>{activateAI(state.ai.provider);if(state.identities.length)activate(item()?.id||state.identities[0].id);else send();});
- win.on('resize',()=>{layout();send();});const accountPoll=setInterval(()=>{for(const i of state.identities)if(panes.has(i.id))detect(i);},3000),toolbarPoll=setInterval(pollToolbar,400),analysisPoll=setInterval(pollAnalysis,900);
+ win.on('resize',()=>{layout();send();});const accountPoll=setInterval(()=>{for(const i of state.identities)if(panes.has(i.id))detect(i);},3000),toolbarPoll=setInterval(pollToolbar,400),analysisPoll=setInterval(pollAnalysis,200);
  win.on('close',()=>{resizeKind=null;railDrag=null;});
  win.on('closed',()=>{win=null;clearInterval(accountPoll);clearInterval(toolbarPoll);clearInterval(analysisPoll);localModels.close();if(settingsView&&!settingsView.webContents.isDestroyed())settingsView.webContents.close();settingsView=null;for(const p of [...panes.values(),...aiPanes.values()])if(!p.view.webContents.isDestroyed())p.view.webContents.close();panes.clear();aiPanes.clear();win=null;});
  ipcMain.handle('workspace',async(event,action,payload)=>{

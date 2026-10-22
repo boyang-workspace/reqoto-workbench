@@ -17,11 +17,26 @@ function installAnalysis(options){
    const post=globalThis.ReqotoTriageCore?.cardPost(target);if(!post||!post.text&&!post.hasMedia&&!post.hasQuotedPost)continue;
    const context=globalThis.ReqotoAnalysisContext?.(target)?.packet;
    const own=context?.targetPost;if(typeof own?.text==='string')post.text=own.text.slice(0,6000);post.mediaRefs=[...(own?.images||[]).map(url=>({url,role:'target'})),...(context?.backgroundPosts||[]).flatMap(p=>(p.images||[]).map(url=>({url,role:'background'})))].slice(0,12);post.hasVideo=Boolean(own?.video);post.backgroundText=(context?.backgroundPosts||[]).map(p=>'Conversation focus (ancestry not verified): '+p.text).join('\n').slice(0,2000);
-   const signature=JSON.stringify([post.text,post.hasMedia,post.hasQuotedPost,post.mediaRefs,post.hasVideo,post.backgroundText]);if(globalThis.ReqotoAnalysisSeen.get(post.id)===signature)continue;
+   const signature=JSON.stringify([post.text,post.hasMedia,post.hasQuotedPost,post.mediaRefs,post.hasVideo,post.backgroundText]);if(globalThis.ReqotoAnalysisSeen.get(post.id)===signature){
+    // X recycles post DOM nodes; restore results through the main-process cache.
+    const host=target.querySelector?.('reqoto-post-tools');
+    if(host?.dataset.reqotoState)continue;
+   }
    globalThis.ReqotoAnalysisSeen.set(post.id,signature);if(globalThis.ReqotoAnalysisSeen.size>500)globalThis.ReqotoAnalysisSeen.delete(globalThis.ReqotoAnalysisSeen.keys().next().value);
-   globalThis.ReqotoAnalysisQueue.push({post,revision:options.revision,sourceUrl:location.href});globalThis.ReqotoPostToolbar?.setSignal(target,{state:'checking',title:options.language==='zh'?'正在本地筛选…':'Analyzing…'});if(globalThis.ReqotoAnalysisQueue.length>=8)break;
+   globalThis.ReqotoAnalysisQueue.push({post,revision:options.revision,sourceUrl:location.href,enqueuedAt:Date.now()});globalThis.ReqotoPostToolbar?.setSignal(target,{state:'checking',title:options.language==='zh'?'正在本地筛选…':'Analyzing…'});if(globalThis.ReqotoAnalysisQueue.length>=8)break;
   }
  };
+ // Scan independently of slow model requests so newly visible posts get queued.
+ globalThis.ReqotoAnalysisTimer=globalThis.setInterval?.(()=>globalThis.ReqotoAnalysisScan?.(),600);
+}
+function nextEntry(){
+ const queue=globalThis.ReqotoAnalysisQueue||[];
+ const visible=new Set([...document.querySelectorAll('article[data-testid="tweet"]')].filter(target=>{const r=target.getBoundingClientRect();return r.bottom>=0&&r.top<=innerHeight;}).map(target=>globalThis.ReqotoTriageCore?.cardPost(target)?.id));
+ for(let n=queue.length-1;n>=0;n--)if(!visible.has(queue[n].post.id)){
+  const [entry]=queue.splice(n,1);globalThis.ReqotoAnalysisSeen?.delete(entry.post.id);
+  for(const target of document.querySelectorAll('article[data-testid="tweet"]'))if(globalThis.ReqotoTriageCore?.cardPost(target)?.id===entry.post.id)globalThis.ReqotoPostToolbar?.clearSignals(target);
+ }
+ return queue.shift();
 }
 function applyResult(id,result,title){
  for(const target of document.querySelectorAll('article[data-testid="tweet"]'))if(globalThis.ReqotoTriageCore?.cardPost(target)?.id===id)globalThis.ReqotoPostToolbar?.setSignal(target,{state:result.label,title,manual:result.manual});
@@ -32,4 +47,4 @@ function releasePending(id,revision,url){
  globalThis.ReqotoAnalysisSeen?.delete(id);
  for(const target of document.querySelectorAll('article[data-testid="tweet"]'))if(globalThis.ReqotoTriageCore?.cardPost(target)?.id===id)globalThis.ReqotoPostToolbar?.clearSignals(target);
 }
-module.exports={installAnalysis,applyResult,releasePending};
+module.exports={nextEntry,installAnalysis,applyResult,releasePending};

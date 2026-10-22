@@ -88,3 +88,44 @@ test('cancelled inference can retry on return but cannot clear a newer page or r
  const run=(revision,url)=>vm.runInNewContext(`(${page.releasePending.toString()})('post','${revision}','${url}')`,context);
  run('old','https://x.com/home');assert.equal(seen.size,1);run('r1','https://x.com/elsewhere');assert.equal(seen.size,1);run('r1','https://x.com/home');assert.equal(seen.size,0);assert.deepEqual(cleared,[target]);
 });
+
+ test('balanced screening accepts moderate relevant openings while strict mode stays selective',()=>{
+ const {decisionResult}=require('../src/analysis.cjs');
+ const result={answers:Object.fromEntries(Object.entries({relevance:.62,contribution:.4,noise:.2,missing:.1}).map(([k,noul])=>[k,{noul}]))};
+ assert.equal(decisionResult(result,{screening:'balanced'}).label,'reply');
+ assert.equal(decisionResult(result,{screening:'strict'}).label,'unsure');
+ for(const key of ['noise','missing']){const blocked=structuredClone(result);blocked.answers[key].noul=.9;assert.notEqual(decisionResult(blocked).label,'reply');}
+ });
+test('scanning runs independently of inference and recycled toolbars can recover cached results',()=>{
+ let tick,state='';const host={dataset:{get reqotoState(){return state;}}};
+ const target={getBoundingClientRect:()=>({bottom:100,top:20,width:300}),querySelector:()=>host};
+ const context={setInterval:fn=>{tick=fn;return 1;},location:{href:'https://x.com/home'},innerHeight:700,document:{querySelectorAll:s=>s.startsWith('article')?[target]:[]},ReqotoTriageCore:{cardPost:()=>({id:'one',text:'Relevant post'})},ReqotoPostToolbar:{configure(){},clearSignals(){},onFeedback(){},setSignal(_t,s){state=s.state;}}};
+ vm.runInNewContext(`(${page.installAnalysis.toString()})({enabled:true,language:'en',revision:'1'});`,context);
+ assert.equal(typeof tick,'function');tick();assert.equal(context.ReqotoAnalysisQueue.length,1);
+ context.ReqotoAnalysisQueue.shift();tick();assert.equal(context.ReqotoAnalysisQueue.length,0);
+ state='reply';tick();assert.equal(context.ReqotoAnalysisQueue.length,0);
+ state='';tick();assert.equal(context.ReqotoAnalysisQueue.length,1);assert.equal(state,'checking');
+});
+test('fast path asks one question and skips media for self-contained text',async()=>{
+ let calls=0,media=0;
+ const judge=new Judge({request:async(_k,_e,body)=>{calls++;assert.deepEqual(Object.keys(body.questions),['worth_reply']);assert.equal(body.images,undefined);return {answers:{worth_reply:{noul:.8}}};}},()=>null);
+ const r=await judge.evaluateFast({text:'I have been testing account switching workflows for a multi-brand browser workspace. Would displaying the active brand beside the reply composer prevent accidental posts?',hasMedia:true},{},{prepareMedia:()=>{media++;}});
+ assert.equal(r.label,'reply');assert.equal(calls,1);assert.equal(media,0);assert.equal(r.timings.visual,false);
+});
+test('fast path requests visual context only when needed and retains missing-media review',async()=>{
+ let calls=0;const judge=new Judge({request:async()=>{calls++;return {answers:{worth_reply:{noul:.8}}};}},()=>null);
+ const r=await judge.evaluateFast({text:'What do you think?',hasMedia:true},{},{prepareMedia:async()=>({text:'What do you think?',hasMedia:true,images:[fakeJpeg],mediaManifest:[{role:'target',kind:'photo'}]})});
+ assert.equal(calls,2);assert.equal(r.label,'reply');assert.equal(r.timings.visual,true);
+ const missing=await judge.evaluateFast({text:'',hasMedia:true},{},{prepareMedia:async()=>({text:'',hasMedia:true,mediaOmitted:true})});assert.equal(missing.label,'unsure');assert.equal(missing.reason,'missing');
+});
+test('fast decision rejects invalid scores and keeps borderline as review',()=>{
+ assert.throws(()=>A.fastResult({answers:{worth_reply:{noul:NaN}}}));
+ assert.equal(A.fastResult({answers:{worth_reply:{noul:.4}}}).label,'unsure');
+ assert.equal(A.fastResult({answers:{worth_reply:{noul:.2}}}).label,'skip');
+});
+test('queue drops offscreen work and makes it retryable when visible again',()=>{
+ const off={post:{id:'off'}},on={post:{id:'on'}};
+ const target={getBoundingClientRect:()=>({top:10,bottom:200})};
+ const context={innerHeight:700,document:{querySelectorAll:()=>[target]},ReqotoTriageCore:{cardPost:()=>({id:'on'})},ReqotoAnalysisQueue:[off,on],ReqotoAnalysisSeen:new Map([['off','signature']])};
+ assert.equal(vm.runInNewContext(`(${page.nextEntry.toString()})()`,context),on);assert.equal(context.ReqotoAnalysisSeen.has('off'),false);
+});

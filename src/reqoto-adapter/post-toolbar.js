@@ -57,7 +57,7 @@
       keyInvalid:language === "zh" ? "检查密钥" : "Check key", quota:language === "zh" ? "检查额度" : "Check credits",
       rateLimited:language === "zh" ? "模型繁忙" : "Model busy", saveError:language === "zh" ? "保存失败" : "Save failed" };
     const state = record.signal?.state || "";
-    text(record.badge, (labels[state] || (enabled ? tr("toolbarReady") : tr("toolbarOff"))) + (manual ? (language === "zh" ? " · 我" : " · You") : ""));
+    text(record.badge, (labels[state] || (enabled ? (language === "zh" ? "待筛选" : "PENDING") : tr("toolbarOff"))) + (manual ? (language === "zh" ? " · 我" : " · You") : ""));
     record.badge.dataset.state = state;
     record.host.dataset.reqotoState = state;
     record.badge.title = record.signal?.title || record.badge.textContent;
